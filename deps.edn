@@ -1,0 +1,27 @@
+{:jolt/min-version "0.8.22"
+
+ :paths ["src"]
+
+ :deps {yogthos/samizdat
+        {:git/url "https://github.com/yogthos/samizdat.git"
+         :git/sha "97727796fc245f918f10b0db52537562aacb80dc"}
+
+        jolt-lang/glimmer
+        {:git/url "https://github.com/jolt-lang/glimmer.git"
+         :git/tag "v0.1.4"
+         :git/sha "09b8ab08705fa1e6f20145c2e99eaaba9ea812cc"}
+
+        jolt-lang/glimmer-gtk
+        {:git/url "https://github.com/jolt-lang/glimmer-gtk.git"
+         :git/sha "3d6c3d69623673fa7b7bce18a9712a99ac682fe8"}
+
+        jolt-lang/glimmer-gl
+        {:git/url "https://github.com/jolt-lang/glimmer-gl.git"
+         :git/sha "c11194924ef47c2245c819d0c0df6eb9c2693d3b"}}
+
+ :aliases {:gui {:main-opts ["-m" "samizdat.gui.core"]}
+           :test {:extra-paths ["test"]
+                  :main-opts ["-m" "samizdat.test-runner"]}}
+
+ :tasks {gui "jolt -M:gui"
+         test "jolt -M:test"}}
