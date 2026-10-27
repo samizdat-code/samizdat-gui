@@ -1,0 +1,73 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  JOLT_VERSION: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test suite and namespace loads
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jolt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fetch() {
+            curl -fsSL --retry 5 --retry-delay 4 --retry-all-errors \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github.raw+json" \
+              https://api.github.com/repos/jolt-lang/jolt/contents/install?ref=main \
+              -o /tmp/jolt-install && test -s /tmp/jolt-install && return 0
+            curl -fsSL --retry 5 --retry-delay 4 --retry-all-errors \
+              https://raw.githubusercontent.com/jolt-lang/jolt/main/install \
+              -o /tmp/jolt-install && test -s /tmp/jolt-install && return 0
+            return 1
+          }
+          for i in 1 2 3 4 5; do
+            fetch && break
+            echo "installer fetch attempt $i failed; retrying in $((i * 8))s" >&2
+            sleep $((i * 8))
+          done
+          test -s /tmp/jolt-install || { echo "could not fetch the jolt installer" >&2; exit 1; }
+          head -1 /tmp/jolt-install | grep -q '^#!' \
+            || { echo "fetched file is not a script:" >&2; head -3 /tmp/jolt-install >&2; exit 1; }
+          version="${JOLT_VERSION:-$(gh release view -R jolt-lang/jolt --json tagName -q .tagName)}"
+          bash /tmp/jolt-install --dir "$HOME/.local/bin" --version "$version"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache jolt gitlibs
+        uses: actions/cache@v4
+        with:
+          path: ~/.jolt/gitlibs
+          key: jolt-gitlibs-${{ hashFiles('deps.edn') }}
+
+      - name: Install GTK and OpenGL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-4-1 libgl1
+
+      - name: Fetch dependencies
+        run: jolt -P
+
+      - name: Test suite
+        run: jolt -M:test
+
+      - name: Cold load
+        run: ./dev/cold-load.sh
+
+      - name: Load the GTK entry point
+        run: jolt -A:test -e '(require (quote samizdat.gui.core))'
